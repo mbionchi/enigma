@@ -1,67 +1,43 @@
-(define rotor-i (list
-   '(#\A #\E) '(#\B #\K) '(#\C #\M) '(#\D #\F) '(#\E #\L) '(#\F #\G) '(#\G #\D)
-   '(#\H #\Q) '(#\I #\V) '(#\J #\Z) '(#\K #\N) '(#\L #\T) '(#\M #\O) '(#\N #\W)
-   '(#\O #\Y) '(#\P #\H) '(#\Q #\X)   "NOTCH"  '(#\R #\U) '(#\S #\S) '(#\T #\P)
-   '(#\U #\A) '(#\V #\I) '(#\W #\B) '(#\X #\R) '(#\Y #\C) '(#\Z #\J)))
+(define alpha       (string->list "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+(define rotor-i     (string->list "EKMFLGDQVZNTOWYHX|USPAIBRCJ"))
+(define rotor-ii    (string->list "AJDKS|IRUXBLHWTMCQGZNPYFVOE"))
+(define rotor-iii   (string->list "BDFHJLCPRTXVZNYEIWGAKM|USQO"))
+(define rotor-iv    (string->list "ESOVPZJAYQ|UIRHXLNFTGKDCMWB"))
+(define rotor-v     (string->list "VZBRGITYUPSDNHLXAWMJQOFECK|"))
+(define reflector-a (string->list "EJMZALYXVBWFCRQUONTSPIKHGD"))
+(define reflector-b (string->list "YRUHQSLDPXNGOKMIEBFZCWVJAT"))
+(define reflector-c (string->list "FVPJIAOYEDRZXWGCTKUQSBNMHL"))
 
-(define rotor-ii (list
-   '(#\A #\A) '(#\B #\J) '(#\C #\D) '(#\D #\K) '(#\E #\S)   "NOTCH"  '(#\F #\I)
-   '(#\G #\R) '(#\H #\U) '(#\I #\X) '(#\J #\B) '(#\K #\L) '(#\L #\H) '(#\M #\W)
-   '(#\N #\T) '(#\O #\M) '(#\P #\C) '(#\Q #\Q) '(#\R #\G) '(#\S #\Z) '(#\T #\N)
-   '(#\U #\P) '(#\V #\Y) '(#\W #\F) '(#\X #\V) '(#\Y #\O) '(#\Z #\E)))
-
-(define rotor-iii (list
-   '(#\A #\B) '(#\B #\D) '(#\C #\F) '(#\D #\H) '(#\E #\J) '(#\F #\L) '(#\G #\C)
-   '(#\H #\P) '(#\I #\R) '(#\J #\T) '(#\K #\X) '(#\L #\V) '(#\M #\Z) '(#\N #\N)
-   '(#\O #\Y) '(#\P #\E) '(#\Q #\I) '(#\R #\W) '(#\S #\G) '(#\T #\A) '(#\U #\K)
-   '(#\V #\M)   "NOTCH"  '(#\W #\U) '(#\X #\S) '(#\Y #\Q) '(#\Z #\O)))
-
-(define reflector-b (list
-   '(#\A #\Y) '(#\B #\R) '(#\C #\U) '(#\D #\H) '(#\E #\Q) '(#\F #\S) '(#\G #\L)
-   '(#\H #\D) '(#\I #\P) '(#\J #\X) '(#\K #\N) '(#\L #\G) '(#\M #\O) '(#\N #\K)
-   '(#\O #\M) '(#\P #\I) '(#\Q #\E) '(#\R #\B) '(#\S #\F) '(#\T #\Z) '(#\U #\C)
-   '(#\V #\W) '(#\W #\V) '(#\X #\J) '(#\Y #\A) '(#\Z #\T)))
-
-(define rotate
-  (lambda (lst)
-    (append (cdr lst) (list (car lst)))))
-
+; TODO
 (define rotate-rotors
   (lambda (rotors)
     rotors))
 
+(define filter
+  (lambda (predicate lst)
+    (let filter ((predicate predicate) (lst lst) (result '()))
+      (cond ((null? lst) result)
+            (else (filter predicate (cdr lst) (append result (cond ((predicate (car lst)) (list (car lst))) (else '())))))))))
 
 (define get-val
-  (lambda (pairs key)
-    (let ((h (car pairs)) (t (cdr pairs)))
-      (cond ((list? (car pairs)) (cond ((char=? (car h) key) (car (cdr h)))
-                                       (else (get-val t key))))
-            (else (get-val t key))))))
-
-(define encrypt-circuit
-  (lambda (circuit char)
-    (cond ((null? circuit) char)
-          (else (encrypt-circuit (cdr circuit) (get-val (car circuit) char))))))
+  (lambda (keys vals key)
+    (let get-val ((keys keys) (vals vals) (key key))
+      (cond ((equal? key (car keys)) (car vals))
+            (else (get-val (cdr keys) (cdr vals) key))))))
 
 (define encrypt-char
   (lambda (rotors reflector char)
-    (encrypt-circuit
-      (append
-        rotors
-        (list reflector)
-        (reverse (map (lambda (lst)
-                        (map (lambda (elm)
-                               (cond ((list? elm) (reverse elm))
-                                     (else elm))) lst))
-                        rotors)))
-      char)))
+    (let encrypt-char ((rotors (append rotors (list reflector))) (inv-rotors (reverse rotors)) (char char))
+      (cond ((null? inv-rotors) char)
+            ((null? rotors) (encrypt-char rotors (cdr inv-rotors) (get-val (filter (lambda (x) (not (equal? x #\|))) (car inv-rotors)) alpha char)))
+            (else (encrypt-char (cdr rotors) inv-rotors (get-val alpha (filter (lambda (x) (not (equal? x #\|))) (car rotors)) char)))))))
 
 (define encrypt
   (lambda (rotors reflector input)
-    (cond ((null? input) '())
-          (else (let ((rotors (rotate-rotors rotors)))
-                  (cons (encrypt-char rotors reflector (car input))
-                        (encrypt (rotate-rotors rotors) reflector (cdr input))))))))
+    (let encrypt ((rotors (rotate-rotors rotors)) (reflector reflector) (input input) (result '()))
+      (cond ((null? input) result)
+            (else (encrypt (rotate-rotors rotors) reflector (cdr input)
+                           (append result (list (encrypt-char rotors reflector (car input))))))))))
 
 ;(tracing 1)
-(display (encrypt (list rotor-iii rotor-ii rotor-i) reflector-b (string->list "HELLOXWORLD")))
+(display (list->string (encrypt (list rotor-iii rotor-ii rotor-i) reflector-b (string->list "HELLOXWORLD"))))
